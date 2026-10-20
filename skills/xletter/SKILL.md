@@ -174,6 +174,6 @@ When this directory is available in an authorized checkout or download, copy the
 
 ## Source and license
 
-Adapted for Agent Skill Exchange metadata from the [upstream xLetter Skill](https://github.com/coffeehc/xletter-skill/tree/main/skills/xletter), based on the [public API contract](https://xletter.51apis.com/skill.md), public-contract v1. The API and operating guidance above are preserved; the catalog metadata and installation/source notes are the distribution-specific additions.
+Adapted for Agent Skill Exchange metadata from the [upstream xLetter Skill](https://github.com/coffeehc/xletter-skill/tree/75287877f891434eb77449458fbf203ca318a4cf/skills/xletter), upstream revision `75287877f891434eb77449458fbf203ca318a4cf`, based on the [public API contract](https://xletter.51apis.com/skill.md), public-contract v1. The API and operating guidance above are preserved; the catalog metadata and installation/source notes are the distribution-specific additions.
 
 This documentation and its examples use [MIT-0](LICENSE). The grant does not cover xLetter's server implementation, hosted service, credentials, or private data. `verification: listed` is the ASE submission tier, not a claim of ASE security review or publication.
