@@ -20,13 +20,25 @@ This catalog entry wraps the official agent skills. Do not invent install URLs, 
 
 ## How an agent should use the official skills
 
-1. **install** — Fetch https://faberlang.dev/.well-known/agent-skills/install/SKILL.md first. It names the current CLI release, the two published archives (`aarch64-apple-darwin` and `x86_64-unknown-linux-gnu`), SHA-256 verification, and PATH placement of `bin/faber`. The archive ships one file; reader packs and the Norma standard library are built into the binary. Prove the install with `faber --version` and `faber explain SEM001`. On any other platform, stop and tell the human. Prefer prebuilts. `cargo build --release -p faber` from the open-source repo builds the compiler front end and MIR runner; release binaries also include the target code generators, which are not in that repository.
+1. **install** — Fetch https://faberlang.dev/.well-known/agent-skills/install/SKILL.md first. It names the current CLI release, the two published archives (`aarch64-apple-darwin` and `x86_64-unknown-linux-gnu`), SHA-256 verification, and PATH placement of `bin/faber`. The archive ships one file; reader packs and the Norma standard library are built into the binary. Verify the downloaded archive against its published SHA-256 before executing any archive contents; stop on a mismatch. Prove the install with `faber --version` and `faber explain SEM001`, then run the first-program check below. On any other platform, stop and tell the human. Prefer prebuilts. `cargo build --release -p faber` from the open-source repo builds the compiler front end and MIR runner; release binaries also include the target code generators, which are not in that repository.
 
 2. **language** — Fetch https://faberlang.dev/.well-known/agent-skills/language/SKILL.md for the English reader spelling. Start at the agent canon https://faberlang.dev/agents/index.md and follow only the links that page names. Meaning lives in HIR; a reader locale is a rendering of that core. English signals include type-first declarations (`string name`, `int n`), `fn name(int a) → int`, bind `←`, equality `≡`, `return`, nullable `int ∪ none` (the missing value is `null`), and comments as a `#` line by itself. Do not write `name: T`, `int?`, `//`, or a `#` after code on the same line.
 
 3. **packages** — Fetch https://faberlang.dev/.well-known/agent-skills/packages/SKILL.md to scaffold and drive packages. `faber init` writes `faber.toml` and `src/main.fab`. Use `faber check` for the front-end type-check loop (lex, parse, type check without building a native binary), `faber run` to interpret, `faber build` to compile (for example `-t rust`), `faber test` for proba suites, `faber format` (add `--write` to apply), and `faber explain <CODE>` for stable diagnostic codes. `norma:*` resolves from the library embedded in the binary; other libraries resolve from the Cista package store recorded in `faber.lock`. Pass `--library-home` only for an intentional local override.
 
 4. **corpus** — Fetch https://faberlang.dev/.well-known/agent-skills/corpus/SKILL.md after the writing guide, as a keyword lookup rather than a substitute for it. Read https://faberlang.dev/llms-full.txt, use the English reader spelling the catalog entry names, then open the term page URL (for example `fn` → https://faberlang.dev/en-US/corpus/fn.html).
+
+## First-program acceptance check
+
+After installing the CLI with the official guide, type-check and run a temporary program:
+
+```bash
+faber_check_dir=$(mktemp -d)
+printf 'main {\n    print "Hello, world!"\n}\n' > "$faber_check_dir/hello.fab"
+faber check "$faber_check_dir/hello.fab" && faber run "$faber_check_dir/hello.fab"
+```
+
+Require both commands to exit successfully and the runner to print `Hello, world!`.
 
 ## Installation
 
@@ -38,11 +50,17 @@ clawhub install install-and-write-faber-romanus
 
 ### Direct repo/manual install
 
-Clone the Agent Skill Exchange repository and copy this skill directory into the skill folder used by your agent runtime:
+Set `skill_root` to a skill folder your agent runtime loads (the path below is an example), then clone and copy the entry. Stop if the destination already exists and review it before replacing anything:
 
 ```bash
 git clone https://github.com/agentskillexchange/skills.git
-cp -R skills/skills/install-and-write-faber-romanus ~/.agent-skills/install-and-write-faber-romanus
+skill_root="$HOME/.agent-skills"
+mkdir -p "$skill_root"
+if [ -e "$skill_root/install-and-write-faber-romanus" ] || [ -L "$skill_root/install-and-write-faber-romanus" ]; then
+  echo "Destination exists; review it before replacing the skill."
+else
+  cp -R skills/skills/install-and-write-faber-romanus "$skill_root/"
+fi
 ```
 
 ### Optional Third-Party Installer
@@ -52,6 +70,10 @@ The `skills` npm package is maintained by Vercel Labs / third parties, not Agent
 ```bash
 npm exec --package=skills@1.5.7 -- skills add agentskillexchange/skills --skill install-and-write-faber-romanus
 ```
+
+## Reviewed provenance
+
+Reviewed on 2026-10-22 against the live official skill catalog and guides, the checksum-verified Linux x64 CLI release `faber-v1.15.2`, and upstream compiler revision [2488ea6153ab29e1ce3474deadf2f31c22a186f7](https://github.com/faberlang/faber/tree/2488ea6153ab29e1ce3474deadf2f31c22a186f7). Fetch the live guides for subsequent releases.
 
 ## Documentation
 
