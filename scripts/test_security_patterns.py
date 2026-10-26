@@ -104,30 +104,108 @@ def main():
             if not security_scan.scan_file(temp_file, [{"id": flags, "regex": regex, "flags": flags}]):
                 failures.append(f"declared regex flags '{flags}' did not match their test input")
 
-        boundary_cases = [
-            ("prompt.system_heading", "### SYSTEM", True),
-            ("prompt.system_heading", "- #### System Dependencies", False),
-            ("prompt.system_heading", "- ### System Requirements", False),
-            ("credentials.read_secret_file", "head ~/.ssh/id_rsa", True),
+        positive_cases = [
+            ("prompt.system_heading", "### SYSTEM", "prompt_injection"),
+            ("prompt.system_heading", "### SYSTEM:", "prompt_injection"),
+            ("prompt.system_heading", "### SYSTEM INSTRUCTIONS", "prompt_injection"),
             (
                 "credentials.read_secret_file",
-                "- [More about log management](https://pm2.keymetrics.io/docs/usage/log-management/)",
-                False,
+                "head ~/.ssh/id_rsa",
+                "credential_harvesting",
+            ),
+            (
+                "credentials.read_secret_file",
+                "secret=$(head -n 1 ~/.ssh/id_rsa)",
+                "credential_harvesting",
+            ),
+            (
+                "credentials.read_secret_file",
+                "Run `head ~/.ssh/id_rsa` to read the private key.",
+                "credential_harvesting",
+            ),
+            (
+                "credentials.read_secret_file",
+                "- `head ~/.ssh/id_rsa`",
+                "credential_harvesting",
+            ),
+            (
+                "credentials.read_secret_file",
+                "- head ~/.ssh/id_rsa",
+                "credential_harvesting",
+            ),
+            (
+                "credentials.read_secret_file",
+                "printf x | grep x ~/.ssh/id_rsa",
+                "credential_harvesting",
             ),
         ]
-        for pattern_id, text, should_match in boundary_cases:
+        for pattern_id, text, expected_class in positive_cases:
             pattern = patterns_by_id.get(pattern_id)
             if pattern is None:
                 failures.append(f"missing pattern required by boundary test: {pattern_id}")
                 continue
             temp_file.write_text(text, encoding="utf-8")
+            findings = security_scan.scan_file(temp_file, patterns)
             matched = any(
                 finding["id"] == pattern_id
-                for finding in security_scan.scan_file(temp_file, [pattern])
+                and classes_by_id.get(finding["id"]) == expected_class
+                for finding in findings
             )
-            if matched != should_match:
-                expectation = "match" if should_match else "not match"
-                failures.append(f"{pattern_id}: expected to {expectation} {text!r}")
+            if not matched:
+                failures.append(
+                    f"{pattern_id}: expected class '{expected_class}' to match {text!r}"
+                )
+
+        negative_cases = [
+            ("prompt.system_heading", "### System Dependencies"),
+            ("prompt.system_heading", "### System Requirements"),
+            ("prompt.system_heading", "- #### System Dependencies"),
+            ("prompt.system_heading", "- ### System Requirements"),
+            (
+                "credentials.read_secret_file",
+                "- [More about log management](https://pm2.keymetrics.io/docs/usage/log-management/)",
+            ),
+        ]
+        for pattern_id, text in negative_cases:
+            temp_file.write_text(text, encoding="utf-8")
+            findings = security_scan.scan_file(temp_file, patterns)
+            if findings:
+                failures.append(
+                    f"{pattern_id}: benign text produced {len(findings)} finding(s): {text!r}"
+                )
+
+        direct_file = Path(temp_dir) / "positive-direct.md"
+        direct_file.write_text(
+            "secret=$(head -n 1 ~/.ssh/id_rsa)", encoding="utf-8"
+        )
+        leaf_dir = Path(temp_dir) / "positive-leaf"
+        leaf_dir.mkdir()
+        (leaf_dir / "SKILL.md").write_text(
+            "secret=$(head -n 1 ~/.ssh/id_rsa)", encoding="utf-8"
+        )
+        for label, target in (
+            ("direct-file", direct_file),
+            ("leaf-directory", leaf_dir),
+        ):
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(REPO_ROOT / "scripts" / "security_scan.py"),
+                    str(target),
+                    "--github-annotations",
+                ],
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+            )
+            if (
+                result.returncode != 1
+                or "[credentials.read_secret_file]" not in result.stdout
+            ):
+                failures.append(
+                    f"{label} CLI expected exit 1 with credentials.read_secret_file, "
+                    f"got exit {result.returncode}: {result.stdout.strip()}"
+                )
 
         empty_dir = Path(temp_dir) / "empty"
         empty_dir.mkdir()
